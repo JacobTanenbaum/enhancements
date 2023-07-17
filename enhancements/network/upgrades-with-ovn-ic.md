@@ -2,6 +2,7 @@
 title: upgrades-with-ovn-ic
 authors:
   - "@ricky-rav"
+  - "@jtan"
 reviewers:
   - "@trozet"
   - "@tsurya"
@@ -10,7 +11,7 @@ approvers:
 api-approvers:
   - "None"
 creation-date: 2023-05-26
-last-updated: 2023-05-26
+last-updated: 2023-07-17
 tracking-link:
   - https://issues.redhat.com/browse/SDN-3905
 ---
@@ -20,42 +21,30 @@ tracking-link:
 **This is a very very initial draft**
 
 ## Summary
-Allow a 4.13 cluster to smoothly upgrade to 4.14, which features OVN IC multizone. 
-Allow a 4.14 multizone cluster to roll back to 4.14 1-zone if needed and also to switch back to multizone.
+
+
+Allow a 4.13 self-hosted or hypershift hosted cluster to smoothly upgrade to 4.14, which features OVN IC multizone. 
+Additionally allow the 4.14 cluster to update changing the zone configuration. 
+
 ## Motivation
-The default in 4.14 will be to have multizone IC (1 node per zone). We need to support:
-- upgrades from 4.13, where OVNK has no zone support, going through an intermediate step with a 1-zone configuration
-- configurations with one global zone, equivalent to today's architecture
-- possibly, configurations with more than one node per zone (nice-to-have)
 
-Anything different than the default multizone configuration needs to be captured by a ConfigMap, which will include the necessary details to:
-- describe the desired non-default zone mode 
-- distinguish between upgrades and non-default (final) configurations
-
-For instance, in order to have a permanent 1-zone configuration, a user should push:
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: ovn-interconnect-configuration
-  namespace: openshift-ovn-kubernetes
-data:
-  zone-mode: singlezone
-  definitive: yes
-```
-
-Additionally, we can also envisage fields to describe a configuration with multiple zones and more than one node per zone. This can be left for future work, if requested.
+Starting in 4.14 the default ovn-kubernetes cluster will be deployed with multizone IC (1 node per zone). Self-hosted and hypershift-hosted clusters will need to support upgrading to 
+the new multizone IC control plane with minimal disruption. 
 
 ### User Stories
+
+I as an Openshift user, either self-hosted or hypershift hosted, want to upgrade my cluster to run ovn-kubernetes 4.14 or beyond with minimal disruption. 
 
 
 ### Goals
 
-
-### Non-Goals
+the ability to upgrade ovn-k clusters from 4.13 -> 4.14 with minimal disruption or additional setup. 
 
 
 ## Proposal
+
+Implement a multistep upgrade process that will take clusters from 4.13 -> 4.14 ovn-k with multizone IC fully configured. Using a similar multistep process be able to configure the 
+network zones as the user sees fit. 
 
 
 ## Design Details
@@ -75,13 +64,15 @@ data:
 
 - CNO will then rollout 1-zone YAMLs: first ovnk node, then ovnk master
 
-- We have now: 4.14 1-zone ovnk, IC configmap with "definitive: no". *We enter CNO upgrade path thanks to the configmap with "definitive: no": can we?*
+- We have now: 4.14 1-zone ovnk, IC configmap with "definitive: no". *We enter CNO upgrade path thanks to the configmap with "definitive: no"
   + CNO rolls out multizone YAMLs. *How does CNO know whether 1-zone YAMLs have all rolled out and we're now in 1-zone IC? By inspecting nodes annotations and tracking rollout progress*
   + CNO nukes old OVN DBs
   + once that is done, the Config Map is also removed
 
 Apart from the removal of the configmap, here the steps are the same as in the cases described below, where there's no upgrade and we want to change the IC configuration. Code should be shared and here it should be called from within the upgrade path. CNO should update its operator status only when the final step of switching to multizone has completed.
 
+#### notes for hypershift
+The update requires a 3 step update process in order to cleanup the database route required by the OVN-K implemenation in hypershift. In order to minimize disruption during the transition from 4.13 -> 4.14 1-zone the route required to connect 4.13 nodes to 4.13 masters needs to remain in place until all the nodes have transitioned to multizone. 
 
 ### 4.13 -> 4.14 1-zone
 
