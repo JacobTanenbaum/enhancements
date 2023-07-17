@@ -1,13 +1,13 @@
 ---
 title: OVN on Hypershift
 authors:
-  - "@russellb
+  - "@russellb"
   - "@squeed"
 reviewers:
   - "@dcbw"
-  - @danwinship
-  - @tssurya
-  - @numans
+  - "@danwinship"
+  - "@tssurya"
+  - "@numans"
 approvers:
   - TBD
 creation-date: 2022-02-01
